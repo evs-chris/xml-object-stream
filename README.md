@@ -1,11 +1,11 @@
-# xml-object-stream
+# xml-object-stream-sax
 
-xml-object-stream is a simple wrapper on top of sax.js that extracts json objects that match a given xpath-ish expression from an xml stream and passes them to a callback or stuffs them into a promised array.
+xml-object-stream-sax is a simple wrapper on top of sax.js that extracts json objects that match a given xpath-ish expression from an xml stream and passes them to a callback or stuffs them into a promised array.
 
 ## Usage
 
 ```javascript
-var xos = require('xml-object-stream')(/* config object */);
+var xos = require('xml-object-stream-sax')(/* config object */);
 var xml = '<library>' +
           '<book published="1622"><author>John</author></book>' +
           '<book author="Jane"><author country="Uganda">Jane</author></book>' +
