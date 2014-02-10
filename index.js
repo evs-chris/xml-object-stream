@@ -1,7 +1,8 @@
 var sax = require('sax'),
     when = require('when'),
     http = require('http'),
-    fs = require('fs');
+    fs = require('fs'),
+    writable = require('stream').Writable;
 
 var reserved = ['attributes', 'children', 'tagName', 'text'];
 
@@ -50,11 +51,41 @@ function buildPojo(from) {
   return res;
 }
 
+function chunkStream(size, from, to, chunkDone) {
+  var stream = writable();
+  stream._write = function(chunk, enc, next) {
+    var pos = 0;
+    if (chunk.length > size) {
+      var go;
+      go = function() {
+        to.write(chunk.slice(pos, pos + size > chunk.length ? chunk.length - 1 : pos + size));
+        pos += size;
+        if (pos >= chunk.length) {
+          chunkDone(next);
+        } else {
+          chunkDone(go);
+        }
+      }
+      go();
+    } else {
+      to.write(chunk);
+      chunkDone(next);
+    }
+  };
+
+  stream.end = function() {
+    to.end();
+  }
+
+  from.pipe(stream);
+}
+
 module.exports = function(config) {
   var cfg = config || {},
       strict = cfg.strict || true,
       icase = cfg.icase || true,
-      pojo = cfg.pojo || false;
+      pojo = cfg.pojo || false,
+      chunkSize = cfg.chunk || 8196;
 
   return function(xml, pattern, cb) {
     var stream = sax.createStream(strict, cfg);
@@ -63,9 +94,32 @@ module.exports = function(config) {
     var matcher = new RegExp('^' + pattern.replace(/\/\//, '\\/.*?') + '$', icase || !strict ? 'i' : '');
     var childMatcher = new RegExp('^' + pattern.replace(/\/\//, '\\/.*?') + '/', icase || !strict ? 'i' : '');
     var defer;
+    var after;
     var collection = [];
 
+    // if callback has a done function, wait until it is called to proceeds
+    var waiting = fired = 0;
+    var shouldWait = !!!cb ? false : cb.length > 1;
+    var waitingTo;
+    function waitToDo(fn) {
+      if (shouldWait && fired < waiting) {
+        if (!!waitingTo) console.error('overwriting waitFn!!!');
+        waitingTo = fn;
+      } else {
+        setImmediate(fn);
+      }
+    }
+
+    function resume() {
+      fired++;
+      if (waiting <= fired) {
+        if (!!waitingTo) setImmediate(waitingTo);
+        waitingTo = null;
+      }
+    }
+
     if (!!!cb) { defer = when.defer(); }
+    else after = { onEnd: function(fn) { after.callback = fn; } };
 
     function current() {
       if (stack.length > 0) return stack[stack.length - 1];
@@ -102,7 +156,12 @@ module.exports = function(config) {
 
       // is this a node we're looking for? 
       if (!!loc.match(matcher)) {
-        if (!!cb) cb(pojo ? n.object : n);
+        if (!!cb) {
+          if (shouldWait) {
+            waiting++;
+            cb(pojo ? n.object : n, resume);
+          } else cb(pojo ? n.object : n);
+        }
         else collection.push(pojo ? n.object : n);
       }
     });
@@ -117,28 +176,35 @@ module.exports = function(config) {
     });
 
     stream.on('end', function() {
-      if (!!!cb) defer.resolve(collection);
+      if (shouldWait) {
+        if (!!after.callback && typeof after.callback === 'function') waitingTo = after.callback;
+      } else {
+        if (!!!cb) defer.resolve(collection);
+        else if (!!after.callback && typeof after.callback === 'function') setImmediate(after.callback);
+      }
     });
 
     if (typeof xml === 'string') {
       if (xml.startsWith('http://') || xml.startsWith('https://')) {
-        http.get(xml, function(res) { res.pipe(stream); }).on('error', function(err) {
+        http.get(xml, function(res) { chunkStream(chunkSize, res, stream, waitToDo); }).on('error', function(err) {
           if (!!!cb) defer.reject(err);
         });
       } else if (xml.startsWith('file://')) {
         var pth = xml.substring(7);
-        fs.createReadStream(pth).pipe(stream);
+        chunkStream(chunkSize, fs.createReadStream(pth), stream, waitToDo);
       } else {
-        stream.write(xml);
-        stream._parser.close();
+        var read = require('stream').Readable();
+        read._read = function() { read.push(xml); }
+        chunkStream(chunkSize, read, stream, waitToDo);
       }
     } else if (!!xml && typeof xml === 'object' && typeof xml.pipe === 'function') {
-      xml.pipe(stream);
+      chunkStream(chunkSize, xml, stream, waitToDo);
     } else {
       stream._parser.close();
       throw "Unknown input format."
     }
 
     if (!!!cb) return defer.promise;
+    else return after;
   };
 };

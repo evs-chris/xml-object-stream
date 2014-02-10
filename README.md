@@ -32,6 +32,11 @@ Instead of creating a dom-ish tree, plain object trees will be assembled with xm
 
 If set to true, the xpath-ish query will be case-insensitive. Non-strict mode enables this by default.
 
+### chunk
+**default: 8196**
+
+If the callback function accepts a done callback, then xml will be processed *chunk* characters at a time. So, there will be a short flood of match callbacks and the xml processor will wait until all of the callbacks are complete before releasing the next chunk. This is convenient for processing very large xml files with callbacks that do a lot of I/O. Instead of firing and queuing tons of callbacks while the rest of xml processing uses the cpu, the xml processor yields control until all of the callbacks are done for each chunk.
+
 ## Arguments
 
 function(xml, xpath[, callback]);
@@ -56,6 +61,8 @@ The matching is done using a non-gready regular expression made out of the xpath
 
 ### callback
 
-For each matching object, the callback will be called with the matched object.
+function(node[, callback]);
+
+For each matching object, the callback will be called with the matched object. If the callback itself accepts a callback, it is expected to call the callback when it is done so that processing may resume.
 
 If no callback is provided a promise will be returned. If the promise is resolved, it will contain an array of all matched objects.
