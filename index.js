@@ -216,7 +216,7 @@ module.exports = function(config) {
         chunkStream(chunkSize, fs.createReadStream(pth), stream, waitToDo);
       } else {
         var read = require('stream').Readable();
-        read._read = function() { read.push(xml); }
+        read._read = function() { read.push(xml); read.push(null); }
         chunkStream(chunkSize, read, stream, waitToDo);
       }
     } else if (!!xml && typeof xml === 'object' && typeof xml.pipe === 'function') {
