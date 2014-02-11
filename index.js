@@ -207,11 +207,11 @@ module.exports = function(config) {
     });
 
     if (typeof xml === 'string') {
-      if (xml.startsWith('http://') || xml.startsWith('https://')) {
+      if (xml.indexOf('http://') === 0 || xml.indexOf('https://') === 0) {
         http.get(xml, function(res) { chunkStream(chunkSize, res, stream, waitToDo); }).on('error', function(err) {
           if (!!!cb) defer.reject(err);
         });
-      } else if (xml.startsWith('file://')) {
+      } else if (xml.indexOf('file://') === 0) {
         var pth = xml.substring(7);
         chunkStream(chunkSize, fs.createReadStream(pth), stream, waitToDo);
       } else {
