@@ -11,5 +11,12 @@
   "dependencies": {
     "sax": "^0",
     "when": "^2"
+  },
+  "devDependencies": {
+    "mocha": "^1",
+    "should": "^3"
+  },
+  "scripts": {
+    "test": "node_modules/.bin/mocha -R spec ./test"
   }
 }
