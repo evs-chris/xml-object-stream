@@ -1,6 +1,6 @@
 {
   "name": "xml-object-stream-sax",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "description": "Wrapper for sax.js that extracts objects that match an xpath-ish expression from an xml stream.",
   "homepage": "https://github.com/evs-chris/xml-object-stream",
   "license": "MIT",
