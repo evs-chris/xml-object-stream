@@ -91,11 +91,23 @@ module.exports = function(config) {
     var stream = sax.createStream(strict, cfg);
     var stack = [];
     var path = [];
-    var matcher = new RegExp('^' + pattern.replace(/\/\//, '\\/.*?') + '$', icase || !strict ? 'i' : '');
-    var childMatcher = new RegExp('^' + pattern.replace(/\/\//, '\\/.*?') + '/', icase || !strict ? 'i' : '');
+    var matcher = [];
+    var childMatcher = [];
     var defer;
     var after;
     var collection = [];
+
+    if (typeof pattern === 'string') {
+      matcher.push(new RegExp('^' + pattern.replace(/\/\//, '\\/.*?') + '$', icase || !strict ? 'i' : ''));
+      childMatcher.push(new RegExp('^' + pattern.replace(/\/\//, '\\/.*?') + '/', icase || !strict ? 'i' : ''));
+    } else if (Array.isArray(pattern)) {
+      for (var i = 0; i < pattern.length; i++) {
+        var pat = pattern[i];
+
+        matcher.push(new RegExp('^' + pat.replace(/\/\//, '\\/.*?') + '$', icase || !strict ? 'i' : ''));
+        childMatcher.push(new RegExp('^' + pat.replace(/\/\//, '\\/.*?') + '/', icase || !strict ? 'i' : ''));
+      }
+    } else throw 'Invalid pattern.';
 
     // if callback has a done function, wait until it is called to proceeds
     var waiting = fired = 0;
@@ -145,24 +157,34 @@ module.exports = function(config) {
       var p = current();
 
       // is this a child of a node we're looking for?
-      if (!!loc.match(childMatcher) && !!p) {
-        if (!pojo) {
-          if (safe(name) && !p.hasOwnProperty(name)) p[name] = n;
-        }
+      for (var i = 0; i < childMatcher.length; i++) {
+        if (!!loc.match(childMatcher[i]) && !!p) {
+          if (!pojo) {
+            if (safe(name) && !p.hasOwnProperty(name)) p[name] = n;
+          }
 
-        if (!!!p.children) p.children = [n];
-        else p.children.push(n);
+          if (!!!p.children) p.children = [n];
+          else p.children.push(n);
+
+          // make sure we don't match more than one pattern
+          break;
+        }
       }
 
       // is this a node we're looking for? 
-      if (!!loc.match(matcher)) {
-        if (!!cb) {
-          if (shouldWait) {
-            waiting++;
-            cb(pojo ? n.object : n, resume);
-          } else cb(pojo ? n.object : n);
+      for (var i = 0; i < matcher.length; i++) {
+        if (!!loc.match(matcher[i])) {
+          if (!!cb) {
+            if (shouldWait) {
+              waiting++;
+              cb(pojo ? n.object : n, resume);
+            } else cb(pojo ? n.object : n);
+          }
+          else collection.push(pojo ? n.object : n);
+
+          // make sure we don't match more than one pattern
+          break;
         }
-        else collection.push(pojo ? n.object : n);
       }
     });
 
