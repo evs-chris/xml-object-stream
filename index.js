@@ -1,6 +1,7 @@
 var sax = require('sax'),
     when = require('when'),
     http = require('http'),
+    https = require('https'),
     fs = require('fs'),
     writable = require('stream').Writable;
 
@@ -171,7 +172,7 @@ module.exports = function(config) {
         }
       }
 
-      // is this a node we're looking for? 
+      // is this a node we're looking for?
       for (var i = 0; i < matcher.length; i++) {
         if (!!loc.match(matcher[i])) {
           if (!!cb) {
@@ -208,7 +209,7 @@ module.exports = function(config) {
 
     if (typeof xml === 'string') {
       if (xml.indexOf('http://') === 0 || xml.indexOf('https://') === 0) {
-        http.get(xml, function(res) { chunkStream(chunkSize, res, stream, waitToDo); }).on('error', function(err) {
+        (xml.indexOf('https://') === 0 ? https : http).get(xml, function(res) { chunkStream(chunkSize, res, stream, waitToDo); }).on('error', function(err) {
           if (!!!cb) defer.reject(err);
         });
       } else if (xml.indexOf('file://') === 0) {
