@@ -223,6 +223,7 @@ module.exports = function(config) {
         if (!cb) defer.resolve(collection);
         else if (!!after.callback && typeof after.callback === 'function') setImmediate(after.callback);
       }
+      resume();
     });
 
     if (typeof xml === 'string') {
