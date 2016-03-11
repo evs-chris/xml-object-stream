@@ -8,7 +8,7 @@ var xml = '<library><shelf id="returns" /><section name="fiction"><shelf id="102
             '<book><title>XML Can Be Fun Too</title><author>Lloyd Christmas</author><contents>' +
               '<chapter id="1">The significance of foo and bar</chapter>' +
               '<chapter id="2">Baz and bat can be fun too</chapter>' +
-              '<chapter id="3">Why leave out bippy?</chapter><pages>41</pages></book>' +
+              '<chapter id="3">Why leave out bippy?</chapter></contents><pages>41</pages></book>' +
           '</shelf></section></library>';
 
 describe('XML Stream', function() {
@@ -19,6 +19,41 @@ describe('XML Stream', function() {
         books.length.should.equal(3);
         done();
       }, done);
+    });
+  });
+
+  describe('with a callback', function() {
+    it('should fire the callback for matched nodes', function(done) {
+      var xos = xoss({ pojo: true });
+      var count = 0;
+      xos(xml, '//book', function(b) {
+        count++;
+        if (count === 1) b.pages.should.equal('411');
+        if (count === 2) b.pages.should.equal('8812');
+        if (count === 3) b.pages.should.equal('41');
+        if (count === 3) done();
+      });
+    });
+
+    it('should be cool with chunking too', function(done) {
+      var xos = xoss({ pojo: true, chunk: 32 });
+      var count = 0;
+      xos(xml, '//book', function(b) {
+        count++;
+        if (count === 1) b.pages.should.equal('411');
+        if (count === 2) b.pages.should.equal('8812');
+        if (count === 3) b.pages.should.equal('41');
+        if (count === 3) done();
+      });
+    });
+  });
+
+  describe('xml as a string', function() {
+    it('should chunk properly', function(done) {
+      var xos = xoss({ chunk: 32 });
+      xos(xml, '//book').then(function(books) {
+        books.length.should.equal(3);
+      }).then(done, done);
     });
   });
 

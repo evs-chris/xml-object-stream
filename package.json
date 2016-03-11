@@ -1,16 +1,16 @@
 {
   "name": "xml-object-stream-sax",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Wrapper for sax.js that extracts objects that match an xpath-ish expression from an xml stream.",
   "homepage": "https://github.com/evs-chris/xml-object-stream",
   "license": "MIT",
   "author": { "name": "Chris Reeves" },
   "main": "index.js",
   "repository": { "type": "git", "url": "https://github.com/evs-chris/xml-object-stream.git" },
+  "keywords": ["xml query", "xml object", "xpath"],
   "files": [ "package.json", "index.js", "LICENSE.md" ],
   "dependencies": {
-    "sax": "^0",
-    "when": "^2"
+    "sax": "^1"
   },
   "devDependencies": {
     "mocha": "^1",

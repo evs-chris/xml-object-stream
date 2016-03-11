@@ -1,5 +1,4 @@
 var sax = require('sax'),
-    when = require('when'),
     http = require('http'),
     https = require('https'),
     fs = require('fs'),
@@ -54,36 +53,49 @@ function buildPojo(from) {
 
 function chunkStream(size, from, to, chunkDone) {
   var stream = writable();
+  var pending = 0;
+  var ended = false;
+
   stream._write = function(chunk, enc, next) {
+    pending++;
+
+    function done() {
+      pending--;
+      next();
+      if (ended) stream.end();
+    }
+
     var pos = 0;
     if (chunk.length > size) {
       var go;
       go = function() {
-        to.write(chunk.slice(pos, pos + size > chunk.length ? chunk.length - 1 : pos + size));
-        pos += size;
+        var sub = chunk.slice(pos, pos + size);
+        to.write(sub);
+        pos += sub.length;
         if (pos >= chunk.length) {
-          chunkDone(next);
+          chunkDone(done);
         } else {
           chunkDone(go);
         }
-      }
+      };
       go();
     } else {
       to.write(chunk);
-      chunkDone(next);
+      chunkDone(done);
     }
   };
 
   stream.end = function() {
-    to.end();
-  }
+    ended = true;
+    if (!pending) to.end();
+  };
 
   from.pipe(stream);
 }
 
 module.exports = function(config) {
   var cfg = config || {},
-      strict = cfg.strict || true,
+      strict = cfg.strict === undefined ? true : cfg.strict,
       icase = cfg.icase || true,
       pojo = cfg.pojo || false,
       chunkSize = cfg.chunk || 8196;
@@ -95,6 +107,7 @@ module.exports = function(config) {
     var matcher = [];
     var childMatcher = [];
     var defer;
+    var promise;
     var after;
     var collection = [];
 
@@ -111,9 +124,10 @@ module.exports = function(config) {
     } else throw 'Invalid pattern.';
 
     // if callback has a done function, wait until it is called to proceeds
-    var waiting = fired = 0;
-    var shouldWait = !!!cb ? false : cb.length > 1;
+    var waiting = 0, fired = 0;
+    var shouldWait = !cb ? false : cb.length > 1;
     var waitingTo;
+
     function waitToDo(fn) {
       if (shouldWait && fired < waiting) {
         if (!!waitingTo) console.error('overwriting waitFn!!!');
@@ -131,8 +145,11 @@ module.exports = function(config) {
       }
     }
 
-    if (!!!cb) { defer = when.defer(); }
-    else after = { onEnd: function(fn) { after.callback = fn; } };
+    if (!cb) {
+      promise = new Promise(function(ok, fail) {
+        defer = { resolve: ok, reject: fail };
+      });
+    } else after = { onEnd: function(fn) { after.callback = fn; } };
 
     function current() {
       if (stack.length > 0) return stack[stack.length - 1];
@@ -156,15 +173,16 @@ module.exports = function(config) {
       path.pop();
       var n = pojo ? { object: buildPojo(stack.pop()), name: name } : build(stack.pop());
       var p = current();
+      var i;
 
       // is this a child of a node we're looking for?
-      for (var i = 0; i < childMatcher.length; i++) {
+      for (i = 0; i < childMatcher.length; i++) {
         if (!!loc.match(childMatcher[i]) && !!p) {
           if (!pojo) {
             if (safe(name) && !p.hasOwnProperty(name)) p[name] = n;
           }
 
-          if (!!!p.children) p.children = [n];
+          if (!p.children) p.children = [n];
           else p.children.push(n);
 
           // make sure we don't match more than one pattern
@@ -173,7 +191,7 @@ module.exports = function(config) {
       }
 
       // is this a node we're looking for?
-      for (var i = 0; i < matcher.length; i++) {
+      for (i = 0; i < matcher.length; i++) {
         if (!!loc.match(matcher[i])) {
           if (!!cb) {
             if (shouldWait) {
@@ -193,7 +211,7 @@ module.exports = function(config) {
       // add text to current
       var n = current();
       if (!!n) {
-        if (!!!n.text) n.text = txt;
+        if (!n.text) n.text = txt;
         else n.text += txt;
       }
     });
@@ -202,7 +220,7 @@ module.exports = function(config) {
       if (shouldWait) {
         if (!!after.callback && typeof after.callback === 'function') waitingTo = after.callback;
       } else {
-        if (!!!cb) defer.resolve(collection);
+        if (!cb) defer.resolve(collection);
         else if (!!after.callback && typeof after.callback === 'function') setImmediate(after.callback);
       }
     });
@@ -210,24 +228,30 @@ module.exports = function(config) {
     if (typeof xml === 'string') {
       if (xml.indexOf('http://') === 0 || xml.indexOf('https://') === 0) {
         (xml.indexOf('https://') === 0 ? https : http).get(xml, function(res) { chunkStream(chunkSize, res, stream, waitToDo); }).on('error', function(err) {
-          if (!!!cb) defer.reject(err);
+          if (!cb) defer.reject(err);
         });
       } else if (xml.indexOf('file://') === 0) {
         var pth = xml.substring(7);
         chunkStream(chunkSize, fs.createReadStream(pth), stream, waitToDo);
       } else {
         var read = require('stream').Readable();
-        read._read = function() { read.push(xml); read.push(null); }
+        var done = false;
+        read._read = function(size) {
+          if (done) return read.push(null);
+          read.push(xml);
+          done = true;
+          return;
+        };
         chunkStream(chunkSize, read, stream, waitToDo);
       }
     } else if (!!xml && typeof xml === 'object' && typeof xml.pipe === 'function') {
       chunkStream(chunkSize, xml, stream, waitToDo);
     } else {
       stream._parser.close();
-      throw "Unknown input format."
+      throw new Error("Unknown input format.");
     }
 
-    if (!!!cb) return defer.promise;
+    if (!cb) return promise;
     else return after;
   };
 };
