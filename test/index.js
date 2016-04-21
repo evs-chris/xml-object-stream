@@ -132,8 +132,8 @@ describe('XML Stream', function() {
 
     describe('freeUnmatchedNodes memory leak', function(){
       it('set to false should leak', function(done) {
-        this.timeout(60000);
-        var iterations = 500;
+        this.timeout(10000);
+        var iterations = 1500;
         var leakdata = 'AAAAAAAAAA';
         var xos = xoss({freeUnmatchedNodes: false});
         var oldMem = process.memoryUsage();
@@ -142,23 +142,32 @@ describe('XML Stream', function() {
           Readable.call(this, options); // pass through the options to the Readable constructor
           this.headPushed = false;
           this.counter = iterations;
+          this.proceeding = true;
         };
 
         util.inherits(MyStream, Readable); // inherit the prototype methods
 
         MyStream.prototype._read = function(n) {
           var self = this;
+          //console.log('read',n,this.counter,self.counter);
           if (!this.headPushed) {
             this.push('<library><shelf>123</shelf>');
+            this.headPushed = true;
           } else {
-            //setTimeout(function () {
-              self.push(leakdata);
-              if (self.counter-- === 0) { // stop the stream
+            setTimeout(function () {
+              if(self.proceeding)self.push(leakdata);
+              if(self.counter === 1){
                 newMem = process.memoryUsage();
-                self.push('</library>');
-                self.push(null);
+                if(self.proceeding)self.push('</library>');
               }
-            //},1);
+              if (self.counter-- <= 0) { // stop the stream
+                if(self.proceeding){
+                  self.proceeding = false;
+                  self.push(null);
+                  self.emit('end');
+                }
+              }
+            },1);
           }
         };
 
@@ -168,22 +177,57 @@ describe('XML Stream', function() {
           newMem.heapUsed.should.be.above(oldMem.heapUsed + leakdata.length*iterations);
           done();
         }, done);
+        xmlFeeder.emit('readable');
       });
 
       it('set to true should not leak', function(done) {
-        var iterations = 500;
+        this.timeout(10000);
+        var iterations = 1500;
         var leakdata = 'AAAAAAAAAA';
-        var xos = xoss({freeUnmatchedNodes: true, chunk: leakdata.length});
-        var xmlFeeder = new stream.Readable();
-        xmlFeeder._read = function(size){ /* do nothing */ };
+        var xos = xoss({freeUnmatchedNodes: true});
         var oldMem = process.memoryUsage();
         var newMem;
+        var MyStream = function(options) {
+          Readable.call(this, options); // pass through the options to the Readable constructor
+          this.headPushed = false;
+          this.counter = iterations;
+          this.proceeding = true;
+        };
+
+        util.inherits(MyStream, Readable); // inherit the prototype methods
+
+        MyStream.prototype._read = function(n) {
+          var self = this;
+          //console.log('read',n,this.counter,self.counter,this.proceeding);
+          if (!this.headPushed) {
+            this.push('<library><shelf>123</shelf>');
+            this.headPushed = true;
+          } else {
+            //setTimeout(function () {
+            if(self.proceeding)self.push(leakdata);
+            if(self.counter === 1){
+              newMem = process.memoryUsage();
+              if(self.proceeding)self.push('</library>');
+            }
+            if (self.counter-- === 0) { // stop the stream
+              if(self.proceeding){
+                self.proceeding = false;
+                self.push(null);
+                self.emit('end');
+              }
+            }
+            //},1);
+          }
+        };
+
+        var xmlFeeder = new MyStream();
         xos(xmlFeeder, ['/library/shelf']).then(function(s) {
+          //console.log(s);
           newMem.heapTotal.should.be.below(oldMem.heapTotal + leakdata.length*iterations);
           newMem.heapUsed.should.be.below(oldMem.heapUsed + leakdata.length*iterations);
           done();
         }, done);
-        setInterval(function(){xmlFeeder.emit('end');xmlFeeder.push(null);},10);
+        xmlFeeder.emit('readable');
       });
     });
 

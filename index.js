@@ -147,18 +147,20 @@ module.exports = function(config) {
     }
 
     function matches(){
-      var matches = false;
-      var loc = '/' + path.join('/');
+      var matched = false;
+      var locm = '/' + path.join('/');
+      //console.log(locm);
       // is this a node or a child node of node we're looking for?
-      for (i = 0; i < matcher.length; i++) {
-        if (!!loc.match(matcher[i]) || !!loc.match(childMatcher[i])) {
-          matches = true;
+      for (var i = 0; i < Math.max(matcher.length,childMatcher.length); i++) {
+        if (!!locm.match(matcher[i]) || !!locm.match(childMatcher[i])) {
+          //console.log(i,matcher[i],childMatcher[i]);
+          matched = true;
           // make sure we don't match more than one pattern
           break;
         }
       }
-
-      return matches;
+      //console.log(matched);
+      return matched;
     }
 
     if (!cb) {
@@ -224,14 +226,18 @@ module.exports = function(config) {
     });
 
     stream.on('text', function(txt) {
-      if(freeUnmatchedNodes){
-        if(!matches()) return;
-      }
-      // add text to current
       var n = current();
-      if (!!n) {
-        if (!n.text) n.text = txt;
-        else n.text += txt;
+      //console.log(txt, n);
+      if(!freeUnmatchedNodes || matches()){
+        // add text to current
+        if (!!n) {
+          if (!n.text) n.text = txt;
+          else n.text += txt;
+        }
+      }else{
+        if (!!n) {
+          n.text = '';
+        }
       }
     });
 
