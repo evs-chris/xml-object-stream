@@ -35,6 +35,18 @@ describe('XML Stream', function() {
       });
     });
 
+    it('should fire the callback for matched nodes with freeUnmatchedNodes', function(done) {
+      var xos = xoss({ pojo: true , freeUnmatchedNodes: true});
+      var count = 0;
+      xos(xml, '//book', function(b) {
+        count++;
+        if (count === 1) b.pages.should.equal('411');
+        if (count === 2) b.pages.should.equal('8812');
+        if (count === 3) b.pages.should.equal('41');
+        if (count === 3) done();
+      });
+    });
+
     it('should be cool with chunking too', function(done) {
       var xos = xoss({ pojo: true, chunk: 32 });
       var count = 0;
@@ -46,6 +58,19 @@ describe('XML Stream', function() {
         if (count === 3) done();
       });
     });
+
+    it('should be cool with chunking too with freeUnmatchedNodes', function(done) {
+      var xos = xoss({ pojo: true, chunk: 32, freeUnmatchedNodes: true });
+      var count = 0;
+      xos(xml, '//book', function(b) {
+        count++;
+        if (count === 1) b.pages.should.equal('411');
+        if (count === 2) b.pages.should.equal('8812');
+        if (count === 3) b.pages.should.equal('41');
+        if (count === 3) done();
+      });
+    });
+
   });
 
   describe('xml as a string', function() {
@@ -77,6 +102,14 @@ describe('XML Stream', function() {
         }, done);
       });
 
+      it('should process all queries in an array with freeUnmatchedNodes', function(done) {
+        var xos = xoss({freeUnmatchedNodes: true});
+        xos(xml, ['/library/shelf', '/library/section/shelf']).then(function(s) {
+          s.length.should.equal(3);
+          done();
+        }, done);
+      });
+
       it('should only match each node at most once', function(done) {
         var xos = xoss();
         xos(xml, ['/library/shelf', '//shelf', '/library/section/shelf']).then(function(s) {
@@ -84,6 +117,15 @@ describe('XML Stream', function() {
           done();
         }, done);
       });
+
+      it('should only match each node at most once with freeUnmatchedNodes', function(done) {
+        var xos = xoss({freeUnmatchedNodes: true});
+        xos(xml, ['/library/shelf', '//shelf', '/library/section/shelf']).then(function(s) {
+          s.length.should.equal(3);
+          done();
+        }, done);
+      });
+
     });
   });
 });

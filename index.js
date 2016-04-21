@@ -98,7 +98,8 @@ module.exports = function(config) {
       strict = cfg.strict === undefined ? true : cfg.strict,
       icase = cfg.icase || true,
       pojo = cfg.pojo || false,
-      chunkSize = cfg.chunk || 8196;
+      chunkSize = cfg.chunk || 8196,
+      freeUnmatchedNodes = cfg.freeUnmatchedNodes || false;
 
   return function(xml, pattern, cb) {
     var stream = sax.createStream(strict, cfg);
@@ -143,6 +144,21 @@ module.exports = function(config) {
         if (!!waitingTo) setImmediate(waitingTo);
         waitingTo = null;
       }
+    }
+
+    function matches(){
+      var matches = false;
+      var loc = '/' + path.join('/');
+      // is this a node or a child node of node we're looking for?
+      for (i = 0; i < matcher.length; i++) {
+        if (!!loc.match(matcher[i]) || !!loc.match(childMatcher[i])) {
+          matches = true;
+          // make sure we don't match more than one pattern
+          break;
+        }
+      }
+
+      return matches;
     }
 
     if (!cb) {
@@ -208,6 +224,9 @@ module.exports = function(config) {
     });
 
     stream.on('text', function(txt) {
+      if(freeUnmatchedNodes){
+        if(!matches()) return;
+      }
       // add text to current
       var n = current();
       if (!!n) {
