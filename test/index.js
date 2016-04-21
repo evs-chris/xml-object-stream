@@ -1,3 +1,5 @@
+var util = require('util');
+var Readable = require('stream').Readable;
 var should = require('should');
 var xoss = require(__dirname + '/../');
 
@@ -127,5 +129,63 @@ describe('XML Stream', function() {
       });
 
     });
+
+    describe('freeUnmatchedNodes memory leak', function(){
+      it('set to false should leak', function(done) {
+        this.timeout(60000);
+        var iterations = 500;
+        var leakdata = 'AAAAAAAAAA';
+        var xos = xoss({freeUnmatchedNodes: false});
+        var oldMem = process.memoryUsage();
+        var newMem;
+        var MyStream = function(options) {
+          Readable.call(this, options); // pass through the options to the Readable constructor
+          this.headPushed = false;
+          this.counter = iterations;
+        };
+
+        util.inherits(MyStream, Readable); // inherit the prototype methods
+
+        MyStream.prototype._read = function(n) {
+          var self = this;
+          if (!this.headPushed) {
+            this.push('<library><shelf>123</shelf>');
+          } else {
+            //setTimeout(function () {
+              self.push(leakdata);
+              if (self.counter-- === 0) { // stop the stream
+                newMem = process.memoryUsage();
+                self.push('</library>');
+                self.push(null);
+              }
+            //},1);
+          }
+        };
+
+        var xmlFeeder = new MyStream();
+        xos(xmlFeeder, ['/library/shelf']).then(function(s) {
+          newMem.heapTotal.should.be.above(oldMem.heapTotal + leakdata.length*iterations);
+          newMem.heapUsed.should.be.above(oldMem.heapUsed + leakdata.length*iterations);
+          done();
+        }, done);
+      });
+
+      it('set to true should not leak', function(done) {
+        var iterations = 500;
+        var leakdata = 'AAAAAAAAAA';
+        var xos = xoss({freeUnmatchedNodes: true, chunk: leakdata.length});
+        var xmlFeeder = new stream.Readable();
+        xmlFeeder._read = function(size){ /* do nothing */ };
+        var oldMem = process.memoryUsage();
+        var newMem;
+        xos(xmlFeeder, ['/library/shelf']).then(function(s) {
+          newMem.heapTotal.should.be.below(oldMem.heapTotal + leakdata.length*iterations);
+          newMem.heapUsed.should.be.below(oldMem.heapUsed + leakdata.length*iterations);
+          done();
+        }, done);
+        setInterval(function(){xmlFeeder.emit('end');xmlFeeder.push(null);},10);
+      });
+    });
+
   });
 });
