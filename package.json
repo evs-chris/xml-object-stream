@@ -17,6 +17,6 @@
     "should": "^3"
   },
   "scripts": {
-    "test": "node_modules/.bin/mocha -R spec ./test"
+    "test": "node_modules/.bin/mocha --expose-gc -R spec ./test"
   }
 }

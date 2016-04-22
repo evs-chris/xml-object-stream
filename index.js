@@ -98,7 +98,8 @@ module.exports = function(config) {
       strict = cfg.strict === undefined ? true : cfg.strict,
       icase = cfg.icase || true,
       pojo = cfg.pojo || false,
-      chunkSize = cfg.chunk || 8196;
+      chunkSize = cfg.chunk || 8196,
+      freeUnmatchedNodes = cfg.hasOwnProperty('freeUnmatchedNodes')?cfg.freeUnmatchedNodes:true;
 
   return function(xml, pattern, cb) {
     var stream = sax.createStream(strict, cfg);
@@ -143,6 +144,20 @@ module.exports = function(config) {
         if (!!waitingTo) setImmediate(waitingTo);
         waitingTo = null;
       }
+    }
+
+    function matches(){
+      var matched = false;
+      var locm = '/' + path.join('/');
+      // is this a node or a child node of node we're looking for?
+      for (var i = 0; i < Math.max(matcher.length,childMatcher.length); i++) {
+        if (!!locm.match(matcher[i]) || !!locm.match(childMatcher[i])) {
+          matched = true;
+          // make sure we don't match more than one pattern
+          break;
+        }
+      }
+      return matched;
     }
 
     if (!cb) {
@@ -208,11 +223,22 @@ module.exports = function(config) {
     });
 
     stream.on('text', function(txt) {
-      // add text to current
       var n = current();
-      if (!!n) {
-        if (!n.text) n.text = txt;
-        else n.text += txt;
+      if(freeUnmatchedNodes){
+        // add text to current
+        if (!!n) {
+          if(matches()) {
+            if (!n.text) n.text = txt;
+            else n.text += txt;
+          }else{
+            n.text = '';
+          }
+        }
+      }else{
+        if(!!n){
+          if (!n.text) n.text = txt;
+          else n.text += txt;
+        }
       }
     });
 
