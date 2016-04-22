@@ -129,107 +129,126 @@ describe('XML Stream', function() {
       });
 
     });
+  });
+  describe('freeUnmatchedNodes memory leak', function(){
 
-    describe('freeUnmatchedNodes memory leak', function(){
-      it('set to false should leak', function(done) {
-        this.timeout(10000);
-        var iterations = 1500;
-        var leakdata = 'AAAAAAAAAA';
-        var xos = xoss({freeUnmatchedNodes: false});
-        var oldMem = process.memoryUsage();
-        var newMem;
-        var MyStream = function(options) {
-          Readable.call(this, options); // pass through the options to the Readable constructor
-          this.headPushed = false;
-          this.counter = iterations;
-          this.proceeding = true;
-        };
+    it('set to true should not leak', function(done) {
+      this.timeout(10000);
+      var iterations = 4000;
+      var leakdata = 'AAAAAAAAAA'.repeat(4096);
+      var xos = xoss({freeUnmatchedNodes: true});
+      var oldMem;
+      var newMem;
 
-        util.inherits(MyStream, Readable); // inherit the prototype methods
+      global.gc();
+      oldMem = process.memoryUsage();
 
-        MyStream.prototype._read = function(n) {
-          var self = this;
-          //console.log('read',n,this.counter,self.counter);
-          if (!this.headPushed) {
-            this.push('<library><shelf>123</shelf>');
-            this.headPushed = true;
-          } else {
-            setTimeout(function () {
-              if(self.proceeding)self.push(leakdata);
-              if(self.counter === 1){
-                newMem = process.memoryUsage();
-                if(self.proceeding)self.push('</library>');
-              }
-              if (self.counter-- <= 0) { // stop the stream
-                if(self.proceeding){
-                  self.proceeding = false;
-                  self.push(null);
-                  self.emit('end');
-                }
-              }
-            },1);
+      var MyStream = function(options) {
+        Readable.call(this, options); // pass through the options to the Readable constructor
+        this.headPushed = false;
+        this.counter = iterations;
+        this.proceeding = true;
+      };
+
+      util.inherits(MyStream, Readable); // inherit the prototype methods
+
+      MyStream.prototype._read = function(n) {
+        var self = this;
+        //console.log('read',n,this.counter,self.counter,this.proceeding);
+        if (!this.headPushed) {
+          this.push('<library><shelf>123</shelf>');
+          this.headPushed = true;
+        } else {
+          //setTimeout(function () {
+          if(self.proceeding && self.counter > 1){
+            self.push(leakdata);
           }
-        };
-
-        var xmlFeeder = new MyStream();
-        xos(xmlFeeder, ['/library/shelf']).then(function(s) {
-          newMem.heapTotal.should.be.above(oldMem.heapTotal + leakdata.length*iterations);
-          newMem.heapUsed.should.be.above(oldMem.heapUsed + leakdata.length*iterations);
-          done();
-        }, done);
-        xmlFeeder.emit('readable');
-      });
-
-      it('set to true should not leak', function(done) {
-        this.timeout(10000);
-        var iterations = 1500;
-        var leakdata = 'AAAAAAAAAA';
-        var xos = xoss({freeUnmatchedNodes: true});
-        var oldMem = process.memoryUsage();
-        var newMem;
-        var MyStream = function(options) {
-          Readable.call(this, options); // pass through the options to the Readable constructor
-          this.headPushed = false;
-          this.counter = iterations;
-          this.proceeding = true;
-        };
-
-        util.inherits(MyStream, Readable); // inherit the prototype methods
-
-        MyStream.prototype._read = function(n) {
-          var self = this;
-          //console.log('read',n,this.counter,self.counter,this.proceeding);
-          if (!this.headPushed) {
-            this.push('<library><shelf>123</shelf>');
-            this.headPushed = true;
-          } else {
-            //setTimeout(function () {
-            if(self.proceeding)self.push(leakdata);
-            if(self.counter === 1){
-              newMem = process.memoryUsage();
-              if(self.proceeding)self.push('</library>');
+          if(self.counter === 1){
+            global.gc();
+            newMem = process.memoryUsage();
+            if(self.proceeding){
+              self.push('</library>');
             }
-            if (self.counter-- === 0) { // stop the stream
-              if(self.proceeding){
-                self.proceeding = false;
-                self.push(null);
-                self.emit('end');
-              }
-            }
-            //},1);
           }
-        };
+          if (self.counter-- <= 0) { // stop the stream
+            if(self.proceeding){
+              self.proceeding = false;
+              self.push(null);
+            }
+          }
+          //},3);
+        }
+      };
 
-        var xmlFeeder = new MyStream();
-        xos(xmlFeeder, ['/library/shelf']).then(function(s) {
-          //console.log(s);
-          newMem.heapTotal.should.be.below(oldMem.heapTotal + leakdata.length*iterations);
-          newMem.heapUsed.should.be.below(oldMem.heapUsed + leakdata.length*iterations);
+      var xmlFeeder = new MyStream();
+      xos(xmlFeeder, ['/library/shelf']).then(function(s) {
+        try {
+          newMem.heapTotal.should.be.belowOrEqual(oldMem.heapTotal + leakdata.length*iterations, 'heapTotal');
+          newMem.heapUsed.should.be.belowOrEqual(oldMem.heapUsed + leakdata.length*iterations, 'heapUsed');
           done();
-        }, done);
-        xmlFeeder.emit('readable');
-      });
+        }catch (e) {
+          done(e);
+        }
+      }, done);
     });
 
+    it('set to false should leak', function(done) {
+      this.timeout(10000);
+      var iterations = 4000;
+      var leakdata = 'AAAAAAAAAA'.repeat(4096);
+      var xos = xoss({freeUnmatchedNodes: false});
+      var oldMem;
+      var newMem;
+
+      global.gc();
+      oldMem = process.memoryUsage();
+      var MyStream = function(options) {
+        Readable.call(this, options); // pass through the options to the Readable constructor
+        this.headPushed = false;
+        this.counter = iterations;
+        this.proceeding = true;
+      };
+
+      util.inherits(MyStream, Readable); // inherit the prototype methods
+
+      MyStream.prototype._read = function(n) {
+        var self = this;
+        //console.log('read',n,this.counter,self.counter,this.proceeding);
+        if (!this.headPushed) {
+          this.push('<library><shelf>123</shelf>');
+          this.headPushed = true;
+        } else {
+          //setTimeout(function () {
+          if(self.proceeding && self.counter > 1){
+            self.push(leakdata);
+          }
+          if(self.counter === 1){
+            global.gc();
+            newMem = process.memoryUsage();
+            if(self.proceeding){
+              self.push('</library>');
+            }
+          }
+          if (self.counter-- <= 0) { // stop the stream
+            if(self.proceeding){
+              self.proceeding = false;
+              self.push(null);
+            }
+          }
+          //},3);
+        }
+      };
+
+      var xmlFeeder = new MyStream();
+      xos(xmlFeeder, ['/library/shelf']).then(function(s) {
+        try {
+          newMem.heapTotal.should.be.aboveOrEqual(oldMem.heapTotal + leakdata.length*iterations, 'heapTotal');
+          newMem.heapUsed.should.be.above(oldMem.heapUsed + leakdata.length*iterations, 'heapUsed');
+          done();
+        }catch (e) {
+          done(e);
+        }
+      }, done);
+    });
   });
 });

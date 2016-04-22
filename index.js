@@ -228,15 +228,20 @@ module.exports = function(config) {
     stream.on('text', function(txt) {
       var n = current();
       //console.log(txt, n);
-      if(!freeUnmatchedNodes || matches()){
+      if(freeUnmatchedNodes){
         // add text to current
         if (!!n) {
-          if (!n.text) n.text = txt;
-          else n.text += txt;
+          if(matches()) {
+            if (!n.text) n.text = txt;
+            else n.text += txt;
+          }else{
+            n.text = '';
+          }
         }
       }else{
-        if (!!n) {
-          n.text = '';
+        if(!!n){
+          if (!n.text) n.text = txt;
+          else n.text += txt;
         }
       }
     });
