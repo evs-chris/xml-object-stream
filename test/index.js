@@ -154,12 +154,10 @@ describe('XML Stream', function() {
 
       MyStream.prototype._read = function(n) {
         var self = this;
-        //console.log('read',n,this.counter,self.counter,this.proceeding);
         if (!this.headPushed) {
           this.push('<library><shelf>123</shelf>');
           this.headPushed = true;
         } else {
-          //setTimeout(function () {
           if(self.proceeding && self.counter > 1){
             self.push(leakdata);
           }
@@ -176,7 +174,6 @@ describe('XML Stream', function() {
               self.push(null);
             }
           }
-          //},3);
         }
       };
 
@@ -213,12 +210,10 @@ describe('XML Stream', function() {
 
       MyStream.prototype._read = function(n) {
         var self = this;
-        //console.log('read',n,this.counter,self.counter,this.proceeding);
         if (!this.headPushed) {
           this.push('<library><shelf>123</shelf>');
           this.headPushed = true;
         } else {
-          //setTimeout(function () {
           if(self.proceeding && self.counter > 1){
             self.push(leakdata);
           }
@@ -235,7 +230,6 @@ describe('XML Stream', function() {
               self.push(null);
             }
           }
-          //},3);
         }
       };
 

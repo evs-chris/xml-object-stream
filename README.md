@@ -38,9 +38,9 @@ If set to true, the xpath-ish query will be case-insensitive. Non-strict mode en
 If the callback function accepts a done callback, then xml will be processed *chunk* characters at a time. So, there will be a short flood of match callbacks and the xml processor will wait until all of the callbacks are complete before releasing the next chunk. This is convenient for processing very large xml files with callbacks that do a lot of I/O. Instead of firing and queuing tons of callbacks while the rest of xml processing uses the cpu, the xml processor yields control until all of the callbacks are done for each chunk.
 
 ### freeUnmatchedNodes
-**default: false**
+**default: true**
 
-If set to true, the text event of sax parser will check if the node is in the matcher xpath or lower. If it is not it will not store text. This behavior is slow and CPU consuming, but more memory effective. Turn it on for large XMLs with line-breaks between nodes in low-RAM environments.
+If set to true, the text event of sax parser will check if the node is in the matcher xpath or lower. If it is not it will not store text. This behavior is slower and CPU consuming, but more memory effective. Turn it off if you know what you're doing.
 
 ## Arguments
 
