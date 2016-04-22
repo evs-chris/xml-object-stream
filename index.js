@@ -105,6 +105,7 @@ module.exports = function(config) {
     var stack = [];
     var path = [];
     var matcher = [];
+    var levels = [];
     var childMatcher = [];
     var defer;
     var promise;
@@ -161,6 +162,19 @@ module.exports = function(config) {
       path.push(node.name);
 
       stack.unshift(node);
+
+      var loc = '/' + path.join('/');
+      // is this a child of a node we're looking for?
+      if (levels[0]) levels.unshift(2);
+      else levels.unshift(0);
+
+      // is this a node we're looking for?
+      for (i = 0; i < matcher.length; i++) {
+        if (!!loc.match(matcher[i])) {
+          levels[0] = 1;
+          break;
+        }
+      }
     });
 
     stream.on('closetag', function(name) {
@@ -169,40 +183,31 @@ module.exports = function(config) {
       var n = pojo ? { object: buildPojo(stack.shift()), name: name } : build(stack.shift());
       var p = stack[0];
       var i;
+      var level = levels.shift();
 
       // is this a child of a node we're looking for?
-      for (i = 0; i < childMatcher.length; i++) {
-        if (!!loc.match(childMatcher[i]) && !!p) {
-          if (!pojo) {
-            if (safe(name) && !p.hasOwnProperty(name)) p[name] = n;
-          }
-
-          if (!p.children) p.children = [n];
-          else p.children.push(n);
-
-          // make sure we don't match more than one pattern
-          break;
+      if (level === 2 && !!p) {
+        if (!pojo) {
+          if (safe(name) && !p.hasOwnProperty(name)) p[name] = n;
         }
+
+        if (!p.children) p.children = [n];
+        else p.children.push(n);
       }
 
       // is this a node we're looking for?
-      for (i = 0; i < matcher.length; i++) {
-        if (!!loc.match(matcher[i])) {
-          if (!!cb) {
-            if (shouldWait) {
-              waiting++;
-              cb(pojo ? n.object : n, resume);
-            } else cb(pojo ? n.object : n);
-          }
-          else collection.push(pojo ? n.object : n);
-
-          // make sure we don't match more than one pattern
-          break;
-        }
+      if (level === 1) {
+        if (!!cb) {
+          if (shouldWait) {
+            waiting++;
+            cb(pojo ? n.object : n, resume);
+          } else cb(pojo ? n.object : n);
+        } else collection.push(pojo ? n.object : n);
       }
     });
 
     stream.on('text', function(txt) {
+      if (!levels[0]) return;
       // add text to current
       var n = stack[0];
       if (!!n) {
