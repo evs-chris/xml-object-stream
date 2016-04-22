@@ -151,11 +151,6 @@ module.exports = function(config) {
       });
     } else after = { onEnd: function(fn) { after.callback = fn; } };
 
-    function current() {
-      if (stack.length > 0) return stack[stack.length - 1];
-      else return null;
-    }
-
     stream.on('error', function(e) {
       this._parser.error = null;
       this._parser.resume();
@@ -165,14 +160,14 @@ module.exports = function(config) {
       // keep path current
       path.push(node.name);
 
-      stack.push(node);
+      stack.unshift(node);
     });
 
     stream.on('closetag', function(name) {
       var loc = '/' + path.join('/');
       path.pop();
-      var n = pojo ? { object: buildPojo(stack.pop()), name: name } : build(stack.pop());
-      var p = current();
+      var n = pojo ? { object: buildPojo(stack.shift()), name: name } : build(stack.shift());
+      var p = stack[0];
       var i;
 
       // is this a child of a node we're looking for?
@@ -209,7 +204,7 @@ module.exports = function(config) {
 
     stream.on('text', function(txt) {
       // add text to current
-      var n = current();
+      var n = stack[0];
       if (!!n) {
         if (!n.text) n.text = txt;
         else n.text += txt;
