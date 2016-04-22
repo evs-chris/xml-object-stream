@@ -86,4 +86,20 @@ describe('XML Stream', function() {
       });
     });
   });
+
+  describe('matching', function() {
+    it('should gather children on matched nodes', function(done) {
+      var count = 0;
+      var xos = xoss({ pojo: true });
+      xos(xml, '//shelf', function(shelf) {
+        if (count === 0) shelf.id.should.equal('returns');
+        else if (count === 1) shelf.book.length.should.equal(2);
+        else if (count === 2) shelf.book.contents.chapter.length.should.equal(3);
+        count++;
+      }).onEnd(function() {
+        count.should.equal(3);
+        done();
+      });
+    });
+  });
 });

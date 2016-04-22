@@ -106,7 +106,6 @@ module.exports = function(config) {
     var path = [];
     var matcher = [];
     var levels = [];
-    var childMatcher = [];
     var defer;
     var promise;
     var after;
@@ -114,13 +113,9 @@ module.exports = function(config) {
 
     if (typeof pattern === 'string') {
       matcher.push(new RegExp('^' + pattern.replace(/\/\//, '\\/.*?') + '$', icase || !strict ? 'i' : ''));
-      childMatcher.push(new RegExp('^' + pattern.replace(/\/\//, '\\/.*?') + '/', icase || !strict ? 'i' : ''));
     } else if (Array.isArray(pattern)) {
       for (var i = 0; i < pattern.length; i++) {
-        var pat = pattern[i];
-
-        matcher.push(new RegExp('^' + pat.replace(/\/\//, '\\/.*?') + '$', icase || !strict ? 'i' : ''));
-        childMatcher.push(new RegExp('^' + pat.replace(/\/\//, '\\/.*?') + '/', icase || !strict ? 'i' : ''));
+        matcher.push(new RegExp('^' + pattern[i].replace(/\/\//, '\\/.*?') + '$', icase || !strict ? 'i' : ''));
       }
     } else throw 'Invalid pattern.';
 
