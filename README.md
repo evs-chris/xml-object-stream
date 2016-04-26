@@ -66,3 +66,26 @@ function(node[, callback]);
 For each matching object, the callback will be called with the matched object. If the callback itself accepts a callback, it is expected to call the callback when it is done so that processing may resume.
 
 If no callback is provided a promise will be returned. If the promise is resolved, it will contain an array of all matched objects.
+
+If a callback is provided, an object with an `onEnd` method will be returned. The `onEnd` method accepts a callback that will be called when all processing is complete.
+
+## Changes
+
+### 0.4.0
+
+* Text from unmatched nodes is now discarded thanks to @sheershoff. Matching should also have slightly less overhead.
+
+### 0.3.0
+
+* __BUG:__ Fixed issues with the wrapped readable stream.
+* The global `Promise` is now used rather than `when`.
+
+### 0.2.0
+
+* If the parser detects a URL starting with `https://` as xml input, it will use the proper client to open the stream.
+
+### 0.1.0
+
+* Harmony is no longer required.
+* Multiple queries can be run simultaneously by passing an array of XPath-ish strings.
+* If a callback is supplied, the object returned from the initial call to process xml will have an `onEnd` method that can be used to set a callback to be triggered after processing is complete.
