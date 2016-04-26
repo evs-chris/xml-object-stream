@@ -1,5 +1,7 @@
 var should = require('should');
 var xoss = require(__dirname + '/../');
+var util = require('util');
+var Readable = require('stream').Readable;
 
 var xml = '<library><shelf id="returns" /><section name="fiction"><shelf id="1023">' +
             '<book title="A Chai Too Hot"><author>TJ Hollowaychuk</author><pages>411</pages></book>' +
@@ -85,5 +87,78 @@ describe('XML Stream', function() {
         }, done);
       });
     });
+  });
+
+  describe('matching', function() {
+    it('should gather children on matched nodes', function(done) {
+      var count = 0;
+      var xos = xoss({ pojo: true });
+      xos(xml, '//shelf', function(shelf) {
+        if (count === 0) shelf.id.should.equal('returns');
+        else if (count === 1) shelf.book.length.should.equal(2);
+        else if (count === 2) shelf.book.contents.chapter.length.should.equal(3);
+        count++;
+      }).onEnd(function() {
+        count.should.equal(3);
+        done();
+      });
+    });
+  });
+
+  it('should discard text for irrelevant nodes', function(done) {
+    this.timeout(10000);
+    var iterations = 4000;
+    var leakdata = 'AAAAAAAAAA'.repeat(4096);
+    var xos = xoss();
+    var oldMem;
+    var newMem;
+
+    global.gc();
+    oldMem = process.memoryUsage();
+
+    var MyStream = function(options) {
+      Readable.call(this, options); // pass through the options to the Readable constructor
+      this.headPushed = false;
+      this.counter = iterations;
+      this.proceeding = true;
+    };
+
+    util.inherits(MyStream, Readable); // inherit the prototype methods
+
+    MyStream.prototype._read = function(n) {
+      var self = this;
+      if (!this.headPushed) {
+        this.push('<library><shelf>123</shelf>');
+        this.headPushed = true;
+      } else {
+        if(self.proceeding && self.counter > 1){
+          self.push(leakdata);
+        }
+        if(self.counter === 1){
+          global.gc();
+          newMem = process.memoryUsage();
+          if(self.proceeding){
+            self.push('</library>');
+          }
+        }
+        if (self.counter-- <= 0) { // stop the stream
+          if(self.proceeding){
+            self.proceeding = false;
+            self.push(null);
+          }
+        }
+      }
+    };
+
+    var xmlFeeder = new MyStream();
+    xos(xmlFeeder, ['/library/shelf']).then(function(s) {
+      try {
+        newMem.heapTotal.should.be.belowOrEqual(oldMem.heapTotal + leakdata.length*iterations, 'heapTotal');
+        newMem.heapUsed.should.be.belowOrEqual(oldMem.heapUsed + leakdata.length*iterations, 'heapUsed');
+        done();
+      }catch (e) {
+        done(e);
+      }
+    }, done);
   });
 });

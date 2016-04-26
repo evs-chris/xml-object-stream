@@ -14,9 +14,9 @@
   },
   "devDependencies": {
     "mocha": "^1",
-    "should": "^3"
+    "should": "^8"
   },
   "scripts": {
-    "test": "node_modules/.bin/mocha -R spec ./test"
+    "test": "node_modules/.bin/mocha --expose-gc -R spec ./test"
   }
 }

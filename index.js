@@ -105,7 +105,7 @@ module.exports = function(config) {
     var stack = [];
     var path = [];
     var matcher = [];
-    var childMatcher = [];
+    var levels = [];
     var defer;
     var promise;
     var after;
@@ -113,13 +113,9 @@ module.exports = function(config) {
 
     if (typeof pattern === 'string') {
       matcher.push(new RegExp('^' + pattern.replace(/\/\//, '\\/.*?') + '$', icase || !strict ? 'i' : ''));
-      childMatcher.push(new RegExp('^' + pattern.replace(/\/\//, '\\/.*?') + '/', icase || !strict ? 'i' : ''));
     } else if (Array.isArray(pattern)) {
       for (var i = 0; i < pattern.length; i++) {
-        var pat = pattern[i];
-
-        matcher.push(new RegExp('^' + pat.replace(/\/\//, '\\/.*?') + '$', icase || !strict ? 'i' : ''));
-        childMatcher.push(new RegExp('^' + pat.replace(/\/\//, '\\/.*?') + '/', icase || !strict ? 'i' : ''));
+        matcher.push(new RegExp('^' + pattern[i].replace(/\/\//, '\\/.*?') + '$', icase || !strict ? 'i' : ''));
       }
     } else throw 'Invalid pattern.';
 
@@ -151,11 +147,6 @@ module.exports = function(config) {
       });
     } else after = { onEnd: function(fn) { after.callback = fn; } };
 
-    function current() {
-      if (stack.length > 0) return stack[stack.length - 1];
-      else return null;
-    }
-
     stream.on('error', function(e) {
       this._parser.error = null;
       this._parser.resume();
@@ -165,51 +156,55 @@ module.exports = function(config) {
       // keep path current
       path.push(node.name);
 
-      stack.push(node);
+      stack.unshift(node);
+
+      var loc = '/' + path.join('/');
+      // is this a child of a node we're looking for?
+      if (levels[0]) levels.unshift(2);
+      else levels.unshift(0);
+
+      // is this a node we're looking for?
+      for (i = 0; i < matcher.length; i++) {
+        if (!!loc.match(matcher[i])) {
+          levels[0] = 1;
+          break;
+        }
+      }
     });
 
     stream.on('closetag', function(name) {
       var loc = '/' + path.join('/');
       path.pop();
-      var n = pojo ? { object: buildPojo(stack.pop()), name: name } : build(stack.pop());
-      var p = current();
+      var n = pojo ? { object: buildPojo(stack.shift()), name: name } : build(stack.shift());
+      var p = stack[0];
       var i;
+      var level = levels.shift();
 
       // is this a child of a node we're looking for?
-      for (i = 0; i < childMatcher.length; i++) {
-        if (!!loc.match(childMatcher[i]) && !!p) {
-          if (!pojo) {
-            if (safe(name) && !p.hasOwnProperty(name)) p[name] = n;
-          }
-
-          if (!p.children) p.children = [n];
-          else p.children.push(n);
-
-          // make sure we don't match more than one pattern
-          break;
+      if (level === 2 && !!p) {
+        if (!pojo) {
+          if (safe(name) && !p.hasOwnProperty(name)) p[name] = n;
         }
+
+        if (!p.children) p.children = [n];
+        else p.children.push(n);
       }
 
       // is this a node we're looking for?
-      for (i = 0; i < matcher.length; i++) {
-        if (!!loc.match(matcher[i])) {
-          if (!!cb) {
-            if (shouldWait) {
-              waiting++;
-              cb(pojo ? n.object : n, resume);
-            } else cb(pojo ? n.object : n);
-          }
-          else collection.push(pojo ? n.object : n);
-
-          // make sure we don't match more than one pattern
-          break;
-        }
+      if (level === 1) {
+        if (!!cb) {
+          if (shouldWait) {
+            waiting++;
+            cb(pojo ? n.object : n, resume);
+          } else cb(pojo ? n.object : n);
+        } else collection.push(pojo ? n.object : n);
       }
     });
 
     stream.on('text', function(txt) {
+      if (!levels[0]) return;
       // add text to current
-      var n = current();
+      var n = stack[0];
       if (!!n) {
         if (!n.text) n.text = txt;
         else n.text += txt;
