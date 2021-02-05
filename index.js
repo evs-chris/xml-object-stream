@@ -110,6 +110,7 @@ module.exports = function(config) {
     var promise;
     var after;
     var collection = [];
+    var cdata;
 
     if (typeof pattern === 'string') {
       matcher.push(new RegExp('^' + pattern.replace(/\/\//, '\\/.*?') + '$', icase || !strict ? 'i' : ''));
@@ -209,6 +210,25 @@ module.exports = function(config) {
         if (!n.text) n.text = txt;
         else n.text += txt;
       }
+    });
+
+    stream.on('opencdata', function() {
+      cdata = '';
+    });
+
+    stream.on('cdata', function(txt) {
+      cdata += txt;
+    });
+
+    stream.on('closecdata', function() {
+      if (!levels[0]) return;
+      // add text to current
+      var n = stack[0];
+      if (!!n) {
+        if (!n.text) n.text = cdata;
+        else n.text += cdata;
+      }
+      cdata = '';
     });
 
     stream.on('end', function() {
