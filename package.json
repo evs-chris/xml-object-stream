@@ -8,7 +8,7 @@
   "main": "index.js",
   "repository": { "type": "git", "url": "https://github.com/evs-chris/xml-object-stream.git" },
   "keywords": ["xml query", "xml object", "xpath", "xml stream"],
-  "files": [ "package.json", "index.js", "LICENSE.md" ],
+  "files": [ "package.json", "index.js", "index.d.ts", "LICENSE.md" ],
   "dependencies": {
     "sax": "^1"
   },
