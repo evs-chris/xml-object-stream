@@ -71,6 +71,11 @@ If a callback is provided, an object with an `onEnd` method will be returned. Th
 
 ## Changes
 
+### 0.5.0
+
+* CDATA is now considered to be text.
+* Typings are now provided.
+
 ### 0.4.0
 
 * Text from unmatched nodes is now discarded thanks to @sheershoff. Matching should also have slightly less overhead.

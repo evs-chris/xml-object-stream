@@ -56,7 +56,7 @@ function chunkStream(size, from, to, chunkDone) {
   var pending = 0;
   var ended = false;
 
-  stream._write = function(chunk, enc, next) {
+  stream._write = function(chunk, _enc, next) {
     pending++;
 
     function done() {
@@ -148,7 +148,7 @@ module.exports = function(config) {
       });
     } else after = { onEnd: function(fn) { after.callback = fn; } };
 
-    stream.on('error', function(e) {
+    stream.on('error', function() {
       this._parser.error = null;
       this._parser.resume();
     });
@@ -174,11 +174,9 @@ module.exports = function(config) {
     });
 
     stream.on('closetag', function(name) {
-      var loc = '/' + path.join('/');
       path.pop();
       var n = pojo ? { object: buildPojo(stack.shift()), name: name } : build(stack.shift());
       var p = stack[0];
-      var i;
       var level = levels.shift();
 
       // is this a child of a node we're looking for?
@@ -251,7 +249,7 @@ module.exports = function(config) {
       } else {
         var read = require('stream').Readable();
         var done = false;
-        read._read = function(size) {
+        read._read = function() {
           if (done) return read.push(null);
           read.push(xml);
           done = true;
